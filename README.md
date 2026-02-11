@@ -96,7 +96,7 @@ PYTHON_API_URL=http://localhost:5000/api/text-to-speech
    - Multiple avatar options
    - Conversation history persistence
 
-## Build for Production
+
 
 ```bash
 npm run build
