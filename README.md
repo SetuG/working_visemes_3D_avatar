@@ -1,6 +1,6 @@
-# AI Avatar Platform - Next.js Frontend
+# AI Avatar Platform 
 
-This is a Next.js frontend for an AI avatar platform with text-to-speech and lip-sync capabilities, similar to navtalk.
+
 
 ## Features
 
