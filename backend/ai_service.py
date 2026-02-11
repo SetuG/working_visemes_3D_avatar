@@ -1,21 +1,18 @@
 """
-AI Response Generator Module
-Supports multiple providers: Groq, Ollama, or Echo (for testing)
+AI Response Generator 
 """
-
 import httpx
 from config import Config
 
-
 class AIProvider:
-    """Base AI Provider interface."""
+    
     
     async def generate_response(self, user_message: str, conversation_history: list = None) -> str:
         raise NotImplementedError
 
 
 class EchoProvider(AIProvider):
-    """Simple echo provider for testing without API keys."""
+   
     
     async def generate_response(self, user_message: str, conversation_history: list = None) -> str:
         responses = {
@@ -32,7 +29,7 @@ class EchoProvider(AIProvider):
             if key in message_lower:
                 return response
         
-        # Default response
+        
         return f"I understand you said: '{user_message}'. I'm currently in demo mode. Connect a real AI provider like Groq or Ollama for intelligent responses!"
 
 
@@ -49,7 +46,7 @@ class GroqProvider(AIProvider):
     
     async def generate_response(self, user_message: str, conversation_history: list = None) -> str:
         try:
-            # Build messages array
+            
             messages = [
                 {
                     "role": "system",
@@ -61,7 +58,7 @@ class GroqProvider(AIProvider):
                 }
             ]
             
-            # Make direct API call to Grok
+            
             async with httpx.AsyncClient(timeout=30.0) as client:
                 response = await client.post(
                     self.api_url,
@@ -118,7 +115,6 @@ class OllamaProvider(AIProvider):
 
 
 def get_ai_provider() -> AIProvider:
-    """Factory function to get the configured AI provider."""
     provider = Config.AI_PROVIDER.lower()
     
     if provider == "groq":
