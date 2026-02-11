@@ -29,25 +29,7 @@ npm install
 npm run dev
 ```
 
-3. Open [http://localhost:3000](http://localhost:3000) in your browser
 
-## Project Structure
-
-```
-visemes_prototype/
-├── app/
-│   ├── api/
-│   │   └── text-to-speech/
-│   │       └── route.ts          # API endpoint for Python backend integration
-│   ├── globals.css               # Global styles
-│   ├── layout.tsx                # Root layout
-│   └── page.tsx                  # Main page component
-├── public/                       # Static assets
-├── .env.local.example           # Environment variables template
-├── next.config.js               # Next.js configuration
-├── tailwind.config.ts           # Tailwind CSS configuration
-└── package.json                 # Dependencies and scripts
-```
 
 ## Python Backend Integration
 
