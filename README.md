@@ -68,41 +68,6 @@ cp .env.local.example .env.local
 PYTHON_API_URL=http://localhost:5000/api/text-to-speech
 ```
 
-3. Uncomment the Python backend connection code in `app/api/text-to-speech/route.ts`
-
-## Technologies Used
-
-- **Next.js 14**: React framework with App Router
-- **TypeScript**: Type-safe JavaScript
-- **Tailwind CSS**: Utility-first CSS framework
-- **Lucide React**: Icon library
-
-## Next Steps
-
-1. **Avatar Integration**: 
-   - Add video player or 3D avatar renderer
-   - Implement lip-sync using viseme data
-
-2. **Python Backend**:
-   - Connect text-to-speech model
-   - Generate viseme data for lip-sync
-   - Return audio files
-
-3. **Voice Input**:
-   - Implement Web Speech API for voice-to-text
-
-4. **Enhanced Features**:
-   - Real-time streaming
-   - Multiple avatar options
-   - Conversation history persistence
 
 
 
-```bash
-npm run build
-npm start
-```
-
-## License
-
-MIT
