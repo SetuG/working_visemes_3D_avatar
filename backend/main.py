@@ -1,8 +1,3 @@
-"""
-AI Avatar Backend API
-FastAPI server for text-to-speech, AI responses, and viseme generation
-"""
-
 import os
 from pathlib import Path
 from fastapi import FastAPI, HTTPException
@@ -17,14 +12,13 @@ from viseme_generator import text_to_visemes, get_viseme_list
 from ai_service import get_ai_provider
 from sadtalker_service import get_sadtalker_service
 
-# Create FastAPI app
+
 app = FastAPI(
     title="AI Avatar Backend",
-    description="Backend API for AI avatar with lip-sync and text-to-speech",
+    description="Backend API for AI avatar with lip-sync and text to speech",
     version="1.0.0"
 )
 
-# CORS middleware for frontend communication
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -39,23 +33,21 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Create directories
+
 static_dir = Path(Config.AUDIO_OUTPUT_DIR)
 static_dir.mkdir(parents=True, exist_ok=True)
 
-# Images directory for avatar source images
+
 images_dir = Path("images")
 images_dir.mkdir(parents=True, exist_ok=True)
 
-# Videos directory for downloaded avatar videos
+
 videos_dir = Path("static/videos")
 videos_dir.mkdir(parents=True, exist_ok=True)
 
-# Mount static files
+
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
-
-# Request/Response Models
 class ChatRequest(BaseModel):
     text: str
     generate_speech: bool = True
@@ -87,9 +79,9 @@ class HealthResponse(BaseModel):
 
 class VideoGenerationRequest(BaseModel):
     text: str
-    image_path: Optional[str] = None  # Path to source image, defaults to person_image.jpg
-    still_mode: bool = True  # Less head motion, more natural for chat
-    use_enhancer: bool = False  # GFPGAN face enhancement
+    image_path: Optional[str] = None  
+    still_mode: bool = True  
+    use_enhancer: bool = False 
 
 
 class VideoGenerationResponse(BaseModel):
@@ -101,10 +93,10 @@ class VideoGenerationResponse(BaseModel):
     audio_url: Optional[str] = None
 
 
-# API Endpoints
+
 @app.get("/", response_model=HealthResponse)
 async def health_check():
-    """Health check endpoint."""
+    
     return HealthResponse(
         status="healthy",
         ai_provider=Config.AI_PROVIDER,
@@ -122,7 +114,7 @@ async def chat(request: ChatRequest):
     4. Generates viseme data for lip-sync
     """
     try:
-        # Get AI provider and generate response
+        
         ai_provider = get_ai_provider()
         ai_response = await ai_provider.generate_response(request.text)
         
@@ -132,10 +124,10 @@ async def chat(request: ChatRequest):
         }
         
         if request.generate_speech:
-            # Generate speech from AI response
+            
             speech_result = await generate_speech(ai_response)
             
-            # Generate viseme data
+            
             visemes = text_to_visemes(ai_response, speech_result["duration"])
             
             response_data.update({
@@ -156,10 +148,10 @@ async def text_to_speech(request: TTSRequest):
     Convert text to speech and generate viseme data.
     """
     try:
-        # Generate speech
+        
         speech_result = await generate_speech(request.text)
         
-        # Generate viseme data
+        
         visemes = text_to_visemes(request.text, speech_result["duration"])
         
         return TTSResponse(
@@ -190,37 +182,30 @@ async def get_config():
 
 @app.post("/api/generate-video", response_model=VideoGenerationResponse)
 async def generate_video(request: VideoGenerationRequest):
-    """
-    Generate a realistic talking head video.
-    1. Receives user text
-    2. Generates AI response
-    3. Converts response to speech (audio file)
-    4. Sends image + audio to SadTalker
-    5. Returns video URL for playback
-    """
+  
     print(f"\n=== Video Generation Request ===")
     print(f"Text: {request.text}")
     print(f"Image path: {request.image_path}")
     
     try:
-        # Get AI provider and generate response
+        
         print("Generating AI response...")
         ai_provider = get_ai_provider()
         ai_response = await ai_provider.generate_response(request.text)
         print(f"AI response: {ai_response}")
         
-        # Determine image path
+       
         print("Checking for image...")
         if request.image_path:
             image_path = Path(request.image_path)
         else:
-            # Default to person_image.jpg in images folder
+            
             image_path = Path("images/person_image.jpg")
         
         print(f"Looking for image at: {image_path.absolute()}")
         
         if not image_path.exists():
-            # Try alternate locations
+            
             alt_paths = [
                 Path("person_image.jpg"),
                 Path("static/person_image.jpg"),
@@ -242,13 +227,12 @@ async def generate_video(request: VideoGenerationRequest):
         
         print(f"Image found at: {image_path.absolute()}")
         
-        # Generate speech from AI response
+       
         print("Generating speech...")
         speech_result = await generate_speech(ai_response)
         print(f"Speech generated: {speech_result['audio_url']}")
         
-        # Get the actual file path of the generated audio
-        # The audio_url is like "/static/speech_xxxxx.mp3"
+        
         audio_filename = speech_result["audio_url"].split("/")[-1]
         audio_path = static_dir / audio_filename
         
@@ -263,8 +247,8 @@ async def generate_video(request: VideoGenerationRequest):
                 error=error_msg
             )
         
-        # Call SadTalker to generate video
-        print("Calling SadTalker API...")
+        
+        print("SadTalker API.")
         sadtalker = get_sadtalker_service()
         result = await sadtalker.generate_talking_video(
             image_path=str(image_path),
@@ -307,7 +291,7 @@ async def generate_video(request: VideoGenerationRequest):
 
 @app.get("/api/check-avatar-image")
 async def check_avatar_image():
-    """Check if the avatar source image exists."""
+    
     image_paths = [
         Path("images/person_image.jpg"),
         Path("person_image.jpg"),
