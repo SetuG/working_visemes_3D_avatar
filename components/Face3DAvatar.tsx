@@ -11,7 +11,7 @@ import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.j
 
 interface Viseme {
   time: number;
-  viseme: number;  // Changed to number (0-21)
+  viseme: number;  
   duration: number;
 }
 
@@ -21,8 +21,7 @@ interface FaceModelProps {
   currentTime: number;
 }
 
-// Mapping from viseme IDs (0-21) to Apple ARKit/FaceCap blend shape names
-// This provides more nuanced and subtle mouth movements
+
 const VISEME_TO_BLENDSHAPE: Record<number, Array<{name: string, weight: number}>> = {
   0: [], // silence - neutral face
   
@@ -185,19 +184,19 @@ function FaceModel({ visemes, isPlaying, currentTime }: FaceModelProps) {
   const targetWeights = useRef<number[]>([]);
   const currentWeights = useRef<number[]>([]);
 
-  // Load the GLB with KTX2 support
+  
   useEffect(() => {
     const loader = new GLTFLoader();
     
-    // Set up Meshopt decoder for compressed geometry
+    
     loader.setMeshoptDecoder(MeshoptDecoder);
     
-    // Set up DRACO loader for compressed geometry
+   
     const dracoLoader = new DRACOLoader();
     dracoLoader.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.5.6/');
     loader.setDRACOLoader(dracoLoader);
     
-    // Try to set up KTX2 loader (may fail on some systems)
+    
     try {
       const ktx2Loader = new KTX2Loader();
       ktx2Loader.setTranscoderPath('https://www.gstatic.com/basis-universal/versioned/2021-04-15-ba1c3e4/');
@@ -208,17 +207,17 @@ function FaceModel({ visemes, isPlaying, currentTime }: FaceModelProps) {
     }
     
     console.log('Starting to load GLB from /facecap.glb');
-    setLoadingStatus('Initializing loader...');
+    setLoadingStatus('Initializing loader.');
     
     loader.load(
       '/facecap.glb',
       (gltf) => {
         console.log('GLB loaded successfully!', gltf);
         console.log('Scene children:', gltf.scene.children);
-        setLoadingStatus('Processing model...');
+        setLoadingStatus('Processing model.');
         setScene(gltf.scene);
         
-        // Log all objects in the scene
+       
         gltf.scene.traverse((child) => {
           console.log('Found object:', child.type, child.name);
           
@@ -265,7 +264,7 @@ function FaceModel({ visemes, isPlaying, currentTime }: FaceModelProps) {
     };
   }, [gl]);
 
-  // Get current viseme based on time
+  
   const getCurrentViseme = (time: number): number => {
     if (!visemes.length) return 0;
     
@@ -277,23 +276,23 @@ function FaceModel({ visemes, isPlaying, currentTime }: FaceModelProps) {
     return 0;
   };
 
-  // Find morph target index by name (case-insensitive partial match)
+  
   const findMorphTargetIndex = (targetName: string): number => {
     const mesh = meshRef.current;
     if (!mesh?.morphTargetDictionary) return -1;
     
-    // Try exact match first
+    
     if (mesh.morphTargetDictionary[targetName] !== undefined) {
       return mesh.morphTargetDictionary[targetName];
     }
     
-    // Try case-insensitive match
+    
     const lowerTarget = targetName.toLowerCase();
     for (const [name, index] of Object.entries(mesh.morphTargetDictionary)) {
       if (name.toLowerCase() === lowerTarget) {
         return index as number;
       }
-      // Partial match
+      
       if (name.toLowerCase().includes(lowerTarget) || lowerTarget.includes(name.toLowerCase())) {
         return index as number;
       }
@@ -302,21 +301,21 @@ function FaceModel({ visemes, isPlaying, currentTime }: FaceModelProps) {
     return -1;
   };
 
-  // Animate morph targets with improved subtlety
+  
   useFrame((state, delta) => {
     const mesh = meshRef.current;
     if (!mesh?.morphTargetInfluences) return;
 
-    // Reset all target weights
+  
     targetWeights.current.fill(0);
 
     if (isPlaying) {
       const currentViseme = getCurrentViseme(currentTime);
       
-      // Get blend shapes for current viseme with their specific weights
+     
       const blendShapes = VISEME_TO_BLENDSHAPE[currentViseme] || [];
       
-      // Set target weights with precise control
+      
       for (const shape of blendShapes) {
         const idx = findMorphTargetIndex(shape.name);
         if (idx >= 0 && idx < targetWeights.current.length) {
@@ -325,8 +324,8 @@ function FaceModel({ visemes, isPlaying, currentTime }: FaceModelProps) {
       }
     }
 
-    // Smooth interpolation for natural movement - slower for more subtle transitions
-    const smoothing = 8; // Lower = slower, more subtle transitions
+    
+    const smoothing = 8; 
     for (let i = 0; i < mesh.morphTargetInfluences.length; i++) {
       currentWeights.current[i] = THREE.MathUtils.lerp(
         currentWeights.current[i] || 0,
@@ -338,7 +337,7 @@ function FaceModel({ visemes, isPlaying, currentTime }: FaceModelProps) {
   });
 
   if (!scene) {
-    return null; // Still loading
+    return null; 
   }
 
   return (
@@ -360,7 +359,7 @@ interface Face3DAvatarProps {
 export default function Face3DAvatar({ visemes, isPlaying, currentTime }: Face3DAvatarProps) {
   const [status, setStatus] = React.useState('Initializing...');
   
-  // Get current viseme for display
+  
   const getCurrentVisemeId = (): number => {
     if (!visemes.length) return 0;
     for (let i = visemes.length - 1; i >= 0; i--) {
@@ -410,7 +409,7 @@ export default function Face3DAvatar({ visemes, isPlaying, currentTime }: Face3D
         />
       </Canvas>
       
-      {/* Status overlay for debugging */}
+      
       <div className="absolute bottom-2 left-2 text-xs text-gray-400 bg-black/50 px-2 py-1 rounded space-y-1">
         <div>Status: {status}</div>
         {isPlaying && (
