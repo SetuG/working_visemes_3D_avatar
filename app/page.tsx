@@ -1,8 +1,23 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
-import { Send, Mic, MicOff, Volume2, VolumeX } from 'lucide-react'
-import Avatar from '@/components/Avatar'
+import { Send, Mic, MicOff, Volume2, VolumeX, User, Video, Layers, Box } from 'lucide-react'
+import VideoStyleAvatar from '@/components/VideoStyleAvatar'
+import ImageBasedAvatar from '@/components/ImageBasedAvatar'
+import VideoAvatar from '@/components/VideoAvatar'
+import dynamic from 'next/dynamic'
+
+// Dynamically import 3D avatar to avoid SSR issues with Three.js
+const Face3DAvatar = dynamic(() => import('@/components/Face3DAvatar'), {
+  ssr: false,
+  loading: () => (
+    <div className="w-full h-full min-h-[400px] flex items-center justify-center bg-slate-800">
+      <div className="text-white">Loading 3D Model...</div>
+    </div>
+  ),
+})
+
+type AvatarStyle = '3d' | 'video' | 'realistic' | 'detailed'
 
 interface Message {
   role: 'user' | 'assistant'
@@ -23,6 +38,15 @@ interface ChatResponse {
   duration: number | null
 }
 
+interface VideoResponse {
+  text: string
+  response: string
+  video_url: string | null
+  video_base64: string | null
+  audio_url: string | null
+  error: string | null
+}
+
 const BACKEND_URL = 'http://localhost:8000'
 
 export default function Home() {
@@ -35,6 +59,14 @@ export default function Home() {
   const [currentVisemes, setCurrentVisemes] = useState<Viseme[]>([])
   const [audioCurrentTime, setAudioCurrentTime] = useState(0)
   const [backendStatus, setBackendStatus] = useState<'checking' | 'online' | 'offline'>('checking')
+  const [avatarStyle, setAvatarStyle] = useState<AvatarStyle>('3d')  // Default to 3D avatar
+  
+  // Video avatar state
+  const [currentVideoUrl, setCurrentVideoUrl] = useState<string | null>(null)
+  const [currentVideoBase64, setCurrentVideoBase64] = useState<string | null>(null)
+  const [isGeneratingVideo, setIsGeneratingVideo] = useState(false)
+  const [videoError, setVideoError] = useState<string | null>(null)
+  const [avatarImageExists, setAvatarImageExists] = useState<boolean | null>(null)
   
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
@@ -46,6 +78,12 @@ export default function Home() {
         const response = await fetch(`${BACKEND_URL}/`)
         if (response.ok) {
           setBackendStatus('online')
+          // Also check if avatar image exists
+          const imageCheck = await fetch(`${BACKEND_URL}/api/check-avatar-image`)
+          if (imageCheck.ok) {
+            const data = await imageCheck.json()
+            setAvatarImageExists(data.exists)
+          }
         } else {
           setBackendStatus('offline')
         }
@@ -85,49 +123,108 @@ export default function Home() {
     // Add user message to chat
     setMessages(prev => [...prev, { role: 'user', content: userMessage }])
     setIsProcessing(true)
+    setVideoError(null)
     
     try {
-      const response = await fetch(`${BACKEND_URL}/api/chat`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ 
-          text: userMessage,
-          generate_speech: true 
-        }),
-      })
-
-      if (response.ok) {
-        const data: ChatResponse = await response.json()
+      // Use video generation only for 'video' avatar style
+      if (avatarStyle === 'video') {
+        setIsGeneratingVideo(true)
+        setCurrentVideoUrl(null)
+        setCurrentVideoBase64(null)
         
-        // Add assistant message
-        setMessages(prev => [...prev, { 
-          role: 'assistant', 
-          content: data.response 
-        }])
+        const response = await fetch(`${BACKEND_URL}/api/generate-video`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ 
+            text: userMessage,
+            still_mode: true,
+            use_enhancer: false
+          }),
+        })
 
-        // Play audio and animate if available
-        if (data.audio_url && data.visemes && !isMuted) {
-          setCurrentVisemes(data.visemes)
+        if (response.ok) {
+          const data: VideoResponse = await response.json()
           
-          // Create and play audio
-          const audio = new Audio(`${BACKEND_URL}${data.audio_url}`)
-          audioRef.current = audio
-          
-          audio.addEventListener('timeupdate', handleTimeUpdate)
-          audio.addEventListener('ended', handleAudioEnd)
-          audio.addEventListener('play', () => setIsPlaying(true))
-          
-          try {
-            await audio.play()
-          } catch (err) {
-            console.error('Audio play error:', err)
-            setIsPlaying(false)
+          // Add assistant message
+          setMessages(prev => [...prev, { 
+            role: 'assistant', 
+            content: data.response 
+          }])
+
+          if (data.error) {
+            setVideoError(data.error)
+            // Fall back to audio if video failed
+            if (data.audio_url && !isMuted) {
+              const audio = new Audio(`${BACKEND_URL}${data.audio_url}`)
+              audioRef.current = audio
+              audio.addEventListener('timeupdate', handleTimeUpdate)
+              audio.addEventListener('ended', handleAudioEnd)
+              audio.addEventListener('play', () => setIsPlaying(true))
+              try {
+                await audio.play()
+              } catch (err) {
+                console.error('Audio play error:', err)
+              }
+            }
+          } else {
+            // Set video URL for playback
+            if (data.video_url) {
+              setCurrentVideoUrl(data.video_url)
+            } else if (data.video_base64) {
+              setCurrentVideoBase64(data.video_base64)
+            }
           }
+        } else {
+          throw new Error('Backend request failed')
         }
+        
+        setIsGeneratingVideo(false)
       } else {
-        throw new Error('Backend request failed')
+        // Original chat flow for canvas-based avatars
+        const response = await fetch(`${BACKEND_URL}/api/chat`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ 
+            text: userMessage,
+            generate_speech: true 
+          }),
+        })
+
+        if (response.ok) {
+          const data: ChatResponse = await response.json()
+          
+          // Add assistant message
+          setMessages(prev => [...prev, { 
+            role: 'assistant', 
+            content: data.response 
+          }])
+
+          // Play audio and animate if available
+          if (data.audio_url && data.visemes && !isMuted) {
+            setCurrentVisemes(data.visemes)
+            
+            // Create and play audio
+            const audio = new Audio(`${BACKEND_URL}${data.audio_url}`)
+            audioRef.current = audio
+            
+            audio.addEventListener('timeupdate', handleTimeUpdate)
+            audio.addEventListener('ended', handleAudioEnd)
+            audio.addEventListener('play', () => setIsPlaying(true))
+            
+            try {
+              await audio.play()
+            } catch (err) {
+              console.error('Audio play error:', err)
+              setIsPlaying(false)
+            }
+          }
+        } else {
+          throw new Error('Backend request failed')
+        }
       }
     } catch (error) {
       console.error('Error:', error)
@@ -135,6 +232,7 @@ export default function Home() {
         role: 'assistant', 
         content: 'Sorry, I could not connect to the backend. Please ensure the Python server is running.' 
       }])
+      setIsGeneratingVideo(false)
     } finally {
       setIsProcessing(false)
     }
@@ -185,28 +283,82 @@ export default function Home() {
           <div className="bg-slate-800/50 backdrop-blur-sm rounded-2xl shadow-2xl border border-purple-500/30 p-6 flex flex-col">
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-2xl font-semibold text-white">AI Avatar</h2>
-              <button
-                onClick={toggleMute}
-                className={`p-2 rounded-lg transition-colors ${
-                  isMuted 
-                    ? 'bg-red-600 hover:bg-red-700 text-white' 
-                    : 'bg-slate-700 hover:bg-slate-600 text-gray-300'
-                }`}
-                title={isMuted ? 'Unmute' : 'Mute'}
-              >
-                {isMuted ? <VolumeX size={20} /> : <Volume2 size={20} />}
-              </button>
+              <div className="flex items-center gap-2">
+                {/* Avatar Style Selector */}
+                <select
+                  value={avatarStyle}
+                  onChange={(e) => setAvatarStyle(e.target.value as AvatarStyle)}
+                  className="bg-slate-700 text-white text-sm px-3 py-2 rounded-lg border border-slate-600 focus:outline-none focus:border-purple-500"
+                >
+                  <option value="3d">3D Face Model</option>
+                  <option value="video">Realistic Video (SadTalker)</option>
+                  <option value="realistic"> Canvas Realistic</option>
+                  <option value="detailed">Canvas Detailed</option>
+                </select>
+                <button
+                  onClick={toggleMute}
+                  className={`p-2 rounded-lg transition-colors ${
+                    isMuted 
+                      ? 'bg-red-600 hover:bg-red-700 text-white' 
+                      : 'bg-slate-700 hover:bg-slate-600 text-gray-300'
+                  }`}
+                  title={isMuted ? 'Unmute' : 'Mute'}
+                >
+                  {isMuted ? <VolumeX size={20} /> : <Volume2 size={20} />}
+                </button>
+              </div>
             </div>
             
-            <div className="flex-1 bg-gradient-to-b from-slate-700/50 to-slate-800/50 rounded-xl flex items-center justify-center relative overflow-hidden border-2 border-purple-500/20">
-              <Avatar 
-                visemes={currentVisemes}
-                isPlaying={isPlaying}
-                currentTime={audioCurrentTime}
-              />
+            {/* Avatar Image Warning */}
+            {avatarStyle === 'video' && avatarImageExists === false && (
+              <div className="mb-4 p-3 bg-yellow-500/20 border border-yellow-500/30 rounded-lg text-yellow-300 text-sm">
+                <p className="font-medium"> Avatar image not found</p>
+                <p className="mt-1">Please place <code className="bg-black/30 px-1 rounded">person_image.jpg</code> in the <code className="bg-black/30 px-1 rounded">backend/images/</code> folder</p>
+              </div>
+            )}
+            
+            {/* Video Error Display */}
+            {videoError && avatarStyle === 'video' && (
+              <div className="mb-4 p-3 bg-red-500/20 border border-red-500/30 rounded-lg text-red-300 text-sm">
+                <p className="font-medium">Video generation error:</p>
+                <p className="mt-1">{videoError}</p>
+              </div>
+            )}
+            
+            <div className="flex-1 bg-gradient-to-b from-slate-700/50 to-slate-800/50 rounded-xl flex items-center justify-center relative overflow-hidden border-2 border-purple-500/20 min-h-[400px]">
+              {avatarStyle === '3d' ? (
+                <Face3DAvatar 
+                  visemes={currentVisemes}
+                  isPlaying={isPlaying}
+                  currentTime={audioCurrentTime}
+                />
+              ) : avatarStyle === 'video' ? (
+                <VideoAvatar 
+                  videoUrl={currentVideoUrl}
+                  videoBase64={currentVideoBase64}
+                  isLoading={isGeneratingVideo}
+                  autoPlay={true}
+                  showControls={true}
+                  onVideoEnd={() => {
+                    // Optional: Clear video after playing
+                  }}
+                />
+              ) : avatarStyle === 'realistic' ? (
+                <VideoStyleAvatar 
+                  visemes={currentVisemes}
+                  isPlaying={isPlaying}
+                  currentTime={audioCurrentTime}
+                />
+              ) : (
+                <ImageBasedAvatar 
+                  visemes={currentVisemes}
+                  isPlaying={isPlaying}
+                  currentTime={audioCurrentTime}
+                />
+              )}
               
               {/* Processing indicator */}
-              {isProcessing && (
+              {isProcessing && !isGeneratingVideo && (
                 <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 bg-purple-600 text-white px-4 py-2 rounded-full text-sm font-medium flex items-center gap-2">
                   <div className="w-2 h-2 bg-white rounded-full animate-bounce"></div>
                   <div className="w-2 h-2 bg-white rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
@@ -296,7 +448,7 @@ export default function Home() {
 
         {/* Footer */}
         <footer className="text-center text-gray-400 text-sm">
-          <p>AI Avatar Platform with Lip-Sync • Backend: FastAPI + Edge TTS</p>
+          <p>AI Avatar Platform </p>
         </footer>
       </div>
     </main>

@@ -1,17 +1,10 @@
 """
 AI Response Generator Module
-Supports multiple providers: Gemini, Ollama, or Echo (for testing)
+Supports multiple providers: Groq, Ollama, or Echo (for testing)
 """
 
 import httpx
 from config import Config
-
-# Try to import Gemini
-try:
-    import google.generativeai as genai
-    GEMINI_AVAILABLE = True
-except ImportError:
-    GEMINI_AVAILABLE = False
 
 
 class AIProvider:
@@ -40,31 +33,56 @@ class EchoProvider(AIProvider):
                 return response
         
         # Default response
-        return f"I understand you said: '{user_message}'. I'm currently in demo mode. Connect a real AI provider like Gemini or Ollama for intelligent responses!"
+        return f"I understand you said: '{user_message}'. I'm currently in demo mode. Connect a real AI provider like Groq or Ollama for intelligent responses!"
 
 
-class GeminiProvider(AIProvider):
-    """Google Gemini AI provider."""
+class GroqProvider(AIProvider):
+    """Groq API provider using direct HTTP calls."""
     
     def __init__(self):
-        if not GEMINI_AVAILABLE:
-            raise ImportError("google-generativeai package not installed")
-        if not Config.GEMINI_API_KEY:
-            raise ValueError("GEMINI_API_KEY not configured")
+        if not Config.GROQ_API_KEY:
+            raise ValueError("GROQ_API_KEY not configured")
         
-        genai.configure(api_key=Config.GEMINI_API_KEY)
-        self.model = genai.GenerativeModel('gemini-pro')
+        self.api_key = Config.GROQ_API_KEY
+        self.api_url = Config.GROQ_API_URL
+        self.model = Config.GROQ_MODEL
     
     async def generate_response(self, user_message: str, conversation_history: list = None) -> str:
         try:
-            # Build conversation context
-            system_prompt = """You are a friendly AI avatar assistant. Keep your responses concise and natural, 
-            as they will be spoken aloud with lip-sync animation. Aim for 1-3 sentences unless more detail is needed."""
+            # Build messages array
+            messages = [
+                {
+                    "role": "system",
+                    "content": "You are a friendly AI avatar assistant. Keep your responses concise and natural, as they will be spoken aloud with lip-sync animation. Aim for 1-3 sentences unless more detail is needed."
+                },
+                {
+                    "role": "user",
+                    "content": user_message
+                }
+            ]
             
-            full_prompt = f"{system_prompt}\n\nUser: {user_message}\n\nAssistant:"
-            
-            response = self.model.generate_content(full_prompt)
-            return response.text
+            # Make direct API call to Grok
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                response = await client.post(
+                    self.api_url,
+                    headers={
+                        "Authorization": f"Bearer {self.api_key}",
+                        "Content-Type": "application/json"
+                    },
+                    json={
+                        "model": self.model,
+                        "messages": messages,
+                        "temperature": 0.7,
+                        "max_tokens": 150
+                    }
+                )
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    return data["choices"][0]["message"]["content"].strip()
+                else:
+                    error_text = response.text
+                    return f"Error from Groq API: {response.status_code} - {error_text}"
         except Exception as e:
             return f"I apologize, but I encountered an error: {str(e)}"
 
@@ -103,8 +121,8 @@ def get_ai_provider() -> AIProvider:
     """Factory function to get the configured AI provider."""
     provider = Config.AI_PROVIDER.lower()
     
-    if provider == "gemini":
-        return GeminiProvider()
+    if provider == "groq":
+        return GroqProvider()
     elif provider == "ollama":
         return OllamaProvider()
     else:
