@@ -11,26 +11,13 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // TODO: Connect to Python backend
-    // This is where you'll forward the request to your Python model
-    // Example:
-    // const pythonBackendUrl = process.env.PYTHON_API_URL || 'http://localhost:5000/api/text-to-speech'
-    // const response = await fetch(pythonBackendUrl, {
-    //   method: 'POST',
-    //   headers: {
-    //     'Content-Type': 'application/json',
-    //   },
-    //   body: JSON.stringify({ text }),
-    // })
-    // const data = await response.json()
-    // return NextResponse.json(data)
+    
 
-    // Placeholder response
     return NextResponse.json({
       message: 'Text received successfully',
       text: text,
-      audioUrl: null, // Will contain the audio file URL from Python backend
-      visemes: null, // Will contain viseme data for lip-sync
+      audioUrl: null, 
+      visemes: null, 
       timestamp: new Date().toISOString(),
       note: 'Python backend integration pending'
     })
