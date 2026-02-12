@@ -56,7 +56,7 @@ The frontend is ready to connect to a Python backend at `/api/text-to-speech`.
 }
 ```
 
-### Connecting Your Python Backend
+### Connecting Python Backend
 
 1. Create a `.env.local` file:
 ```bash
